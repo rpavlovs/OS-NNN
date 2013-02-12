@@ -1,0 +1,10 @@
+#!/bin/csh
+
+echo "Should return an error"
+sys161 kernel "p testbin/tail tailfile 27;q"
+echo "Should return an error"
+sys161 kernel "p testbin/tail tailfile 10000;q"
+echo "Should return an error"
+sys161 kernel "p testbin/tail tailfile -1;q"
+echo "Should return an error"
+sys161 kernel "p testbin/tail tailfile -1000;q"

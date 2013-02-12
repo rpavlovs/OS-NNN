@@ -1,0 +1,9 @@
+#!/bin/csh
+
+# Single process
+sys161 kernel "p newtests/vm-stack1;q"
+echo "-----------"
+sys161 kernel "p newtests/vm-stack2;q"
+echo "-----------"
+
+

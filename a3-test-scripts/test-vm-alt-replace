@@ -1,0 +1,15 @@
+#!/bin/csh
+
+# Single process
+echo "-----------"
+sys161 kernel "p newtests/vm-data1; q"
+echo "-----------"
+echo "Using alternative TLB replacement algorithm"
+sys161 kernel "tlbalg; p newtests/vm-data1; q"
+echo "-----------"
+sys161 kernel "p newtests/vm-data2; q"
+echo "-----------"
+echo "Using alternative TLB replacement algorithm"
+sys161 kernel "tlbalg; p newtests/vm-data2; q"
+
+

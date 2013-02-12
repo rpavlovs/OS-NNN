@@ -1,0 +1,101 @@
+(see edit history at the end)
+
+There are 3 main high level sets of tests to run.
+
+Each of these calls separate tests.
+See the source for each of the high-level tests
+to see how the sub-scripts are called.
+
+run-batch-A3
+   - Runs a bunch of tests in batch mode.
+   - Probably best to run as:
+     ./run-batch-A3 |& tee out.A3
+   - These tests are the the non optional tests.
+   - Some tests write to read-only pages.
+   - Except for test-vm-consecutive, they require only very 
+     simple write to console and exit (which can halt).
+     test-vm-consecutive requires runprogram to return back
+     to the menu after the program has exited.
+   - These scripts call some of the new test programs for this
+     assignment.
+
+run-batch-A3-option1
+   - Runs some optional tests that require more system calls
+     to work. Mostly fork/waitpid/exit/execv.
+   - Run as:
+    ./run-batch-A3-option1 |& tee out.A3-option1
+
+run-batch-A3-option2
+   - additional tests that can use open/close and read/write
+     for file access
+   - aka "A2 tests"
+   - Run as:
+    ./run-batch-A3-option2 |& tee out.A3-option2
+
+run-batch-A3-all
+   - Just a handy way to run all of the above
+     Puts output into
+     out.A3, out.A3-option1, out.A3-option2
+
+For info about A2 tests. See the README from a2-test-scripts.
+
+-------
+New tests for this assignment:
+
+vm-crash1 - each of these eventually
+vm-crash2   writes to read-only pages
+vm-crash3   and should crash the user program (not the kernel)
+
+vm-data1  - each of these writes primarily (not exclusively)
+vm-data2    to data pages
+vm-data3
+
+vm-stack1 - each of these writes primarily (not exclusively)
+vm-stack2   to stack page
+-------
+
+# We assume your directory structure is as follows
+# $HOME/cs350-os161
+# $HOME/cs350-os161/os161-1.11
+# $HOME/cs350-os161/root
+#
+# And that kernel-ASST2 is compiled and installed in
+# $HOME/cs350-os161/root
+
+cd $HOME/cs350-os161/os161-1.11
+
+# This creates the directory a3-test-script and its contents.
+~cs350/bin/tar -xzf ~cs350/pub/os161_repository/a3-test-scripts.tar.gz
+
+cd $HOME/cs350-os161
+ln -s os161-1.11/a3-test-scripts .
+
+cd a3-test-scripts
+
+# This will build and install some new programs into
+# the directory newtests and create some symbolic links
+# to the kernel-ASST3 in the root directory and to
+# testbin and bin in that directory.
+# Note: that compilation of some of the new test programs
+# can take a bit of time.
+
+make
+
+
+
+
+---------------------
+edit history
+
+W10 version:
+
+Tim Brecht
+Fri Mar 26 19:42:24 EDT 2010
+
+S10 changes:
+
+Alex Pytel
+July 3rd, 2010
+
+- enabled file access tests (except for lseek)
+

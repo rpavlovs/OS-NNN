@@ -1,0 +1,114 @@
+bin/mv/mv.c: * In certain circumstances, Unix mv will fall back to copying and
+CHANGES:20020121 dholland	Fix bug in copyinstr/copyoutstr code.
+CHANGES:20010925 dholland	Use setjmp() and longjmp() for aborting copyin/copyout.
+CHANGES:20010226 dholland	Fix another bug in copyin/copyout code.
+CHANGES:20010225 dholland	Fix bug in mips copyin/copyout code.
+kern/arch/mips/conf/conf.arch:file        lib/copyinout.c			# copyin/out et al.
+kern/arch/mips/include/pcb.h:	jmp_buf pcb_copyjmp;            // jump area used by copyin/out etc.
+kern/arch/mips/mips/start.S:    * where P is the next whole page after copying the argument string.
+kern/arch/mips/mips/trap.c:	 * set by copyin/copyout and related functions to signify that
+kern/arch/mips/mips/trap.c:	 * going to be "copyfail" (see copyinout.c), which longjmps 
+kern/arch/mips/mips/trap.c:	 * back to copyin/copyout or wherever and returns EFAULT.
+kern/arch/mips/mips/trap.c:	 * that is currently executing in copyin (or whichever), and
+kern/compile/ASST0/depend.mk:copyinout.o: ../../lib/copyinout.c ../../include/types.h machine/types.h \
+kern/compile/ASST0/files.mk:copyinout.o: ${S}/lib/copyinout.c
+kern/compile/ASST0/files.mk:	${COMPILE.c} ${S}/lib/copyinout.c
+kern/compile/ASST0/files.mk:SRCS+=${S}/lib/copyinout.c
+kern/compile/ASST0/files.mk:OBJS+=copyinout.o
+Binary file kern/compile/ASST0/copyinout.o matches
+Binary file kern/compile/ASST0/uio.o matches
+Binary file kern/compile/ASST0/kernel matches
+kern/compile/ASST1/depend.mk:copyinout.o: ../../lib/copyinout.c ../../include/types.h machine/types.h \
+kern/compile/ASST1/files.mk:copyinout.o: ${S}/lib/copyinout.c
+kern/compile/ASST1/files.mk:	${COMPILE.c} ${S}/lib/copyinout.c
+kern/compile/ASST1/files.mk:SRCS+=${S}/lib/copyinout.c
+kern/compile/ASST1/files.mk:OBJS+=copyinout.o
+Binary file kern/compile/ASST1/copyinout.o matches
+Binary file kern/compile/ASST1/uio.o matches
+Binary file kern/compile/ASST1/kernel matches
+kern/compile/ASST2/depend.mk:copyinout.o: ../../lib/copyinout.c ../../include/types.h machine/types.h \
+kern/compile/ASST2/files.mk:copyinout.o: ${S}/lib/copyinout.c
+kern/compile/ASST2/files.mk:	${COMPILE.c} ${S}/lib/copyinout.c
+kern/compile/ASST2/files.mk:SRCS+=${S}/lib/copyinout.c
+kern/compile/ASST2/files.mk:OBJS+=copyinout.o
+Binary file kern/compile/ASST2/copyinout.o matches
+Binary file kern/compile/ASST2/uio.o matches
+Binary file kern/compile/ASST2/kernel matches
+Binary file kern/compile/ASST2/filesyscalls.o matches
+kern/include/lib.h: * copyin/copyout/copyinstr/copyoutstr are standard BSD kernel functions.
+kern/include/lib.h: * copyin copies LEN bytes from a user-space address USERSRC to a
+kern/include/lib.h: * copyinstr copies a null-terminated string of at most LEN bytes from
+kern/include/lib.h:int copyin(const_userptr_t usersrc, void *dest, size_t len);
+kern/include/lib.h:int copyinstr(const_userptr_t usersrc, char *dest, size_t len, size_t *got);
+kern/lib/CVS/Entries:/copyinout.c/1.1.1.1/Wed Sep 14 21:36:13 2011//
+kern/lib/copyinout.c: * User/kernel memory copying functions.
+kern/lib/copyinout.c: * this code works, namely, setting pcb_badfaultfunc and then copying
+kern/lib/copyinout.c: * Recovery function. If a fatal fault occurs during copyin, copyout,
+kern/lib/copyinout.c: * copyinstr, or copyoutstr, execution resumes here. (This behavior is
+kern/lib/copyinout.c: * copyin
+kern/lib/copyinout.c:copyin(const_userptr_t usersrc, void *dest, size_t len)
+kern/lib/copyinout.c: * Common string copying function that behaves the way that's desired
+kern/lib/copyinout.c: * for copyinstr and copyoutstr.
+kern/lib/copyinout.c: * copyinstr
+kern/lib/copyinout.c:copyinstr(const_userptr_t usersrc, char *dest, size_t len, size_t *actual)
+kern/userprog/loadelf.c: * memory-mapped files, map each segment instead of copying it into RAM.
+kern/userprog/uio.c:				    result = copyin(iov->iov_ubase, ptr, size);
+kern/userprog/filesyscalls.c:  	result = copyinstr(filename, fname, sizeof(fname), NULL);
+lib/libc/memcpy.c:	 * For speedy copying, optimize the common case where both pointers
+./CHANGES:20020121 dholland	Fix bug in copyinstr/copyoutstr code.
+./CHANGES:20010925 dholland	Use setjmp() and longjmp() for aborting copyin/copyout.
+./CHANGES:20010226 dholland	Fix another bug in copyin/copyout code.
+./CHANGES:20010225 dholland	Fix bug in mips copyin/copyout code.
+./bin/mv/mv.c: * In certain circumstances, Unix mv will fall back to copying and
+./kern/arch/mips/conf/conf.arch:file        lib/copyinout.c			# copyin/out et al.
+./kern/arch/mips/include/pcb.h:	jmp_buf pcb_copyjmp;            // jump area used by copyin/out etc.
+./kern/arch/mips/mips/start.S:    * where P is the next whole page after copying the argument string.
+./kern/arch/mips/mips/trap.c:	 * set by copyin/copyout and related functions to signify that
+./kern/arch/mips/mips/trap.c:	 * going to be "copyfail" (see copyinout.c), which longjmps 
+./kern/arch/mips/mips/trap.c:	 * back to copyin/copyout or wherever and returns EFAULT.
+./kern/arch/mips/mips/trap.c:	 * that is currently executing in copyin (or whichever), and
+./kern/compile/ASST0/depend.mk:copyinout.o: ../../lib/copyinout.c ../../include/types.h machine/types.h \
+./kern/compile/ASST0/files.mk:copyinout.o: ${S}/lib/copyinout.c
+./kern/compile/ASST0/files.mk:	${COMPILE.c} ${S}/lib/copyinout.c
+./kern/compile/ASST0/files.mk:SRCS+=${S}/lib/copyinout.c
+./kern/compile/ASST0/files.mk:OBJS+=copyinout.o
+Binary file ./kern/compile/ASST0/copyinout.o matches
+Binary file ./kern/compile/ASST0/uio.o matches
+Binary file ./kern/compile/ASST0/kernel matches
+./kern/compile/ASST1/depend.mk:copyinout.o: ../../lib/copyinout.c ../../include/types.h machine/types.h \
+./kern/compile/ASST1/files.mk:copyinout.o: ${S}/lib/copyinout.c
+./kern/compile/ASST1/files.mk:	${COMPILE.c} ${S}/lib/copyinout.c
+./kern/compile/ASST1/files.mk:SRCS+=${S}/lib/copyinout.c
+./kern/compile/ASST1/files.mk:OBJS+=copyinout.o
+Binary file ./kern/compile/ASST1/copyinout.o matches
+Binary file ./kern/compile/ASST1/uio.o matches
+Binary file ./kern/compile/ASST1/kernel matches
+./kern/compile/ASST2/depend.mk:copyinout.o: ../../lib/copyinout.c ../../include/types.h machine/types.h \
+./kern/compile/ASST2/files.mk:copyinout.o: ${S}/lib/copyinout.c
+./kern/compile/ASST2/files.mk:	${COMPILE.c} ${S}/lib/copyinout.c
+./kern/compile/ASST2/files.mk:SRCS+=${S}/lib/copyinout.c
+./kern/compile/ASST2/files.mk:OBJS+=copyinout.o
+Binary file ./kern/compile/ASST2/copyinout.o matches
+Binary file ./kern/compile/ASST2/uio.o matches
+Binary file ./kern/compile/ASST2/kernel matches
+Binary file ./kern/compile/ASST2/filesyscalls.o matches
+./kern/include/lib.h: * copyin/copyout/copyinstr/copyoutstr are standard BSD kernel functions.
+./kern/include/lib.h: * copyin copies LEN bytes from a user-space address USERSRC to a
+./kern/include/lib.h: * copyinstr copies a null-terminated string of at most LEN bytes from
+./kern/include/lib.h:int copyin(const_userptr_t usersrc, void *dest, size_t len);
+./kern/include/lib.h:int copyinstr(const_userptr_t usersrc, char *dest, size_t len, size_t *got);
+./kern/lib/CVS/Entries:/copyinout.c/1.1.1.1/Wed Sep 14 21:36:13 2011//
+./kern/lib/copyinout.c: * User/kernel memory copying functions.
+./kern/lib/copyinout.c: * this code works, namely, setting pcb_badfaultfunc and then copying
+./kern/lib/copyinout.c: * Recovery function. If a fatal fault occurs during copyin, copyout,
+./kern/lib/copyinout.c: * copyinstr, or copyoutstr, execution resumes here. (This behavior is
+./kern/lib/copyinout.c: * copyin
+./kern/lib/copyinout.c:copyin(const_userptr_t usersrc, void *dest, size_t len)
+./kern/lib/copyinout.c: * Common string copying function that behaves the way that's desired
+./kern/lib/copyinout.c: * for copyinstr and copyoutstr.
+./kern/lib/copyinout.c: * copyinstr
+./kern/lib/copyinout.c:copyinstr(const_userptr_t usersrc, char *dest, size_t len, size_t *actual)
+./kern/userprog/loadelf.c: * memory-mapped files, map each segment instead of copying it into RAM.
+./kern/userprog/uio.c:				    result = copyin(iov->iov_ubase, ptr, size);
+./kern/userprog/filesyscalls.c:  	result = copyinstr(filename, fname, sizeof(fname), NULL);
+./lib/libc/memcpy.c:	 * For speedy copying, optimize the common case where both pointers

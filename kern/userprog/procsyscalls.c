@@ -1,0 +1,345 @@
+/*
+* Process-related syscalls.
+* New for ASST1.
+*/
+
+#include <types.h>
+#include <kern/errno.h>
+#include <kern/unistd.h>
+#include <lib.h>
+#include <thread.h>
+#include <curthread.h>
+#include <clock.h>
+#include <syscall.h>
+#include <machine/trapframe.h>
+#include <addrspace.h>
+#include <test.h>
+#include <vm.h>
+#include <vfs.h>
+#include <test.h>
+#include "opt-A2.h"
+
+#if OPT_A2
+
+/*
+This process wants to exit.
+Need to clean up the process structure and the thread structure.
+
+Does the process have a parent?
+	If no, then what?
+		then there are no threads waiting for it with waitpid. The parent must have exited, or it never had a parent.
+		Since only parents are allowed to wait on children, then we can safely remove the process entirely.
+			1) Give up the PID
+			2) Forget the process entirely
+	If yes, then what?
+		then, we check if that parent is still running, or if it exited. 
+		If it's running, there CAN be some processes waiting for this thread to finish. Since it has a parent, and parents need to always be able to get the exit code with waitpid,
+		we must exit the process, clean it up, but leave a memory of it in the process table.
+		If the parent is exited, then we do same thing as if it had no parent, because the exited parent will never wait for it's child.
+
+Either way, we notify the "waiting" threads that are waiting for this process to end with a waitpid call.
+All waitpid calls should wait for the thread to exit on a CV for that thread. The exiting process should broadcast to all threads on this CV.
+*/
+int sys__exit(int exitcode) 
+{
+	lock_acquire(proctable_lock);
+	struct cv *waitpid_cv = curthread->t_process->waitpid_cv;
+	
+	fdtable_destroy();
+	if (curthread->t_process->parent == NULL) {
+		(void)exitcode;
+		int result = proctable_remove_process(curthread->t_process->pid);
+		// We're already exiting, so if there's an error with the line above, then it doesn't matter that much
+		(void)result;
+	} else {
+		int result = proctable_set_process_exited(curthread->t_process->pid, exitcode);
+		// We're already exiting, so if there's an error with the line above, then it doesn't matter that much
+		(void)result;
+	}
+
+	// Notify the waiting threads that this process has exited
+	cv_signal(waitpid_cv, proctable_lock);
+	cv_destroy(waitpid_cv);
+	lock_release(proctable_lock);
+  	thread_exit(); // When thread exits, make sure it DOESN'T kfree the process, because it may still be needed. Instead, kfree the process in the process table
+	return 0;
+}
+
+// Really easy function
+// Just return the PID of the current process
+int sys_getpid(pid_t *retpid)
+{
+	*retpid = curthread->t_process->pid;
+	return 0;
+}
+
+/*	
+Waitpid waits for a process to exit. One of several things could happen here.
+First, we need to find out what the process is actually doing. We get the process by it's PID.
+
+If the process doesn't exist at all, then waitpid fails. Can this even happen? In our case, probably not.
+If the process exists, then we check if the current process is the parent of the process we retrieved. If not, waitpid fails. 
+If the process exists and is the child of the current process
+	but is already exited, then we just return the exit status, and we're all good.
+	but is still running,
+		then we need wait for it to finish running, and inform us when it has done doing so
+			We need to mark that we're interested in the process (process interest count ++?)
+			We need to wait on the processes CV while the process is still running
+*/
+int sys_waitpid(pid_t pid, u_int32_t *retstatus, int options, pid_t *retpid)
+{
+	if (retstatus == NULL) return EFAULT;
+
+	// The options argument should be 0. You are not required to implement any options.
+	// Check to make sure that options you do not support are not requested.
+	if (options != 0) return EINVAL;
+	
+	lock_acquire(proctable_lock);
+	struct process *matching_process = proctable_get_process(pid);
+
+	// Current process doesn't exist. Either it exited a long time ago, or never existed
+	// Either way, waitpid fails
+	if (matching_process == NULL) {
+		*retstatus = -1;
+		lock_release(proctable_lock);
+		return EAGAIN;
+	}
+
+	// Current process is not the parent of the process we're calling waitpid on.
+	// This is not allowed, so waitpid fails
+	if (matching_process->parent != curthread->t_process) {
+		lock_release(proctable_lock);
+		return EAGAIN;
+	}
+
+	// Here, we assume the process exists and is the child of the current process
+	const int exited = STATUS_EXITED;
+	const int running = STATUS_RUNNING;
+
+	if (matching_process->status == exited) {
+		*retpid = pid;
+		*retstatus = matching_process->exit_code;
+		lock_release(proctable_lock);
+		return 0;
+	} else {
+		// The process is still running
+		while (matching_process->status == running) {
+			cv_wait(matching_process->waitpid_cv, proctable_lock);
+		}
+		*retpid = pid;
+		*retstatus = matching_process->exit_code;
+		lock_release(proctable_lock);
+		return 0;
+	}
+}
+
+// struct used for passing information between the parent and the child process during fork()
+struct fork_info {
+	struct semaphore * sem;	// used to make the parent wait until the child is ready
+	struct thread * parent; // used by child, so it can copy over the addrspace, etc.
+	struct trapframe *tf;	// child copies this trapframe
+	pid_t child_pid;		// used to pass the child's pid to the parent
+							// -1 when child process ran out of memory, 0 when no more processes available
+};
+
+// The parent copies the appropriate data from itself to its child in this function
+void start_child(void * data1, unsigned long unused) {
+	(void)unused;
+	struct fork_info * info = data1;
+	struct addrspace * new_as;
+	struct trapframe new_tf;
+
+	/* copy address space */
+	if (as_copy(info->parent->t_vmspace, &new_as)) {
+		info->child_pid = ENOMEM; // Means no memory for process
+		V(info->sem);	// child is done, parent should resume.
+		thread_exit();
+	}
+	curthread->t_vmspace = new_as;
+	as_activate(new_as);
+
+	/* copy trap frame to new curkstack */
+	memcpy(&new_tf, info->tf, sizeof(struct trapframe));
+	/* change tf's registers to return values for syscall */
+	new_tf.tf_v0 = 0;
+	new_tf.tf_a3 = 0;
+	new_tf.tf_epc += 4;
+
+	/* create process and get the pid */
+	struct process *new_process = proctable_add_child_process(curthread->t_process);
+	if (new_process == NULL) {
+		info->child_pid = EAGAIN; // Means no more processes available in process table
+		V(info->sem);	// child is done, parent should resume.
+		thread_exit();
+	}
+	info->child_pid = new_process->pid;
+	new_process->parent = info->parent->t_process;
+
+	// Attach new process to our thread
+	curthread->t_process = new_process;
+
+	// Initalize new file table
+	int result = fdtable_create();
+	if (result) 
+	{
+		// Error occured
+		info->child_pid = result;
+		result = proctable_remove_process(new_process->pid);
+		// We're already exiting, so if there's an error with the line above, then it doesn't matter that much
+		V(info->sem);	// child is done, parent should resume.
+		thread_exit();
+	}
+
+	struct process * parent_process = info->parent->t_process;
+	lock_acquire(parent_process->t_fdtable_lock);
+
+	// Copy file table
+	// This requires the filetable to be locked and the refcounts of each file to be increased.
+	int i;
+	for (i = 0; i < OPEN_MAX ; i++) {
+		new_process->t_fdtable->entries[i] = parent_process->t_fdtable->entries[i];
+		if (new_process->t_fdtable->entries[i] != NULL) new_process->t_fdtable->entries[i]->refcount++;	// Increases the number of references to a file
+	}
+	lock_release(parent_process->t_fdtable_lock);
+
+	// child is done, parent should resume.
+	V(info->sem);
+
+	mips_usermode(&new_tf);
+
+	/* mips_usermode does not return */
+	panic("start_child returned\n");
+}
+
+/*
+Fork needs to :
+	Copy address space
+	Copy trap frame
+	Create process
+	Copy file table, and in this
+		increase refcount to files by 1
+		acquire filetable lock when editing filetable (including increasing refcount)
+
+We use a semaphore because start_child does all the work so only fork needs to wait on start_child.
+This is done via the fork_info structure to create a means of communication between the two functions.
+Since start_child needs to copy data from the parent thread and the fork_info is defined in the fork stack frame, we need fork to wait until start_child is done.
+Fork does not care about start_child afterwards because the only thing it's interested in is the generated PID which is saved with the fork_info.
+*/
+int sys_fork(struct trapframe *tf, int * retval) {
+	struct fork_info info;
+
+	/* Create fork_info */
+	info.sem = sem_create("fork synch", 0);
+	if (info.sem == NULL) {
+		*retval = -1;
+		return ENOMEM;
+	}
+	info.parent = curthread;
+	info.tf = tf;	
+
+	/* fork the thread; start_child does all the work using fork_info */
+	int result;
+	result = thread_fork("forked", &info, 0, &start_child, NULL);
+	
+	if (result) {
+		sem_destroy(info.sem);
+		*retval = -1;
+		return ENOMEM;
+	}
+
+	P(info.sem); // wait until the child is ready (has a pid)
+	*retval = info.child_pid;
+	sem_destroy(info.sem);
+
+	// Checks for errors denoted by the child_pid generated by start_child
+	if (info.child_pid == 0) {
+		*retval = -1;
+		return EAGAIN;
+	} else if (info.child_pid < 0) {
+		*retval = -1;
+		return ENOMEM;
+	} else {
+		return 0;
+	}
+}
+
+int sys_execv(userptr_t program, userptr_t args)
+{
+	(void)program;
+	(void)args;
+	return EAGAIN;
+	/*	
+	struct vnode *v = NULL;
+	vaddr_t entrypoint, stackptr;
+	int result;
+	struct addrspace *new, *old;
+	
+	int i,j;
+	char **argv = NULL;
+	int argc = 0;
+
+	// Open the file.
+	result = vfs_open((char*)program, O_RDONLY, &v);
+	if (result) {
+		return result;
+	}
+
+	// Create a new address space. 
+	old = curthread->t_vmspace;
+	new = as_create();
+	if (new==NULL) {
+		vfs_close(v);
+		return ENOMEM;
+	}else{
+		curthread->t_vmspace = new;
+		// Destroy old adderss space
+		as_destroy(curthread->t_vmspace);
+	}
+	
+	// Activate it. 
+	as_activate(curthread->t_vmspace);
+		
+	// Load the executable.
+	result = load_elf(v, &entrypoint);
+	if (result) {
+		// thread_exit destroys curthread->t_vmspace
+		vfs_close(v);
+		return result;
+	}	
+	
+	// Done with the file now.
+	vfs_close(v);
+	
+	
+	// Define the user stack in the address space
+	result = as_define_stack(curthread->t_vmspace, &stackptr);
+	if (result) {
+		// thread_exit destroys curthread->t_vmspace
+		return result;
+	}
+	
+	// Argument Passing
+
+	for(i=0; ((char**)args)[i] != NULL; i++){}
+	argc = i;
+	
+	argv = kmalloc(sizeof(char*) * argc);
+	argv[argc] = NULL;
+	
+	for(i=0; ((char**)args)[i] != '\0'; i++){
+		for(j=0; ((char**)args)[i][j]; j++){}
+		argv[i] = kmalloc(sizeof(char) * j);
+		copyin((userptr_t) (((char**)args)[i]), argv[i], j);
+	}
+
+	
+	// Enter user mode with the arguments in place
+	md_usermode(argc, argv, stackptr, entrypoint);
+	
+	// md_usermode does not return 
+	panic("md_usermode returned\n");
+	return EINVAL;
+	*/
+}
+
+#endif /* OPT_A2 */

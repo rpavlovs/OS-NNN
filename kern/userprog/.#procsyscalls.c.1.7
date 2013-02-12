@@ -1,0 +1,68 @@
+/*
+* Process-related syscalls.
+* New for ASST1.
+*/
+
+#include <types.h>
+#include <kern/errno.h>
+#include <lib.h>
+#include <thread.h>
+#include <curthread.h>
+#include <clock.h>
+#include <syscall.h>
+#include <machine/trapframe.h>
+#include <addrspace.h>
+#include <test.h>
+#include "opt-A2.h"
+
+#if OPT_A2
+
+int sys__exit(int exitcode) 
+{
+	(void)exitcode;
+  	thread_exit();
+  	return EAGAIN;
+}
+
+int sys_getpid(pid_t *retpid)
+{
+	*retpid = curthread->process->pid;
+	return 0;
+}
+
+int sys_fork(struct trapframe *tf, pid_t *retpid)
+{
+	(void) tf;
+	(void) retpid;
+	return EUNIMP;
+}
+
+/*
+ *	Wait for the process specified by pid to exit, 
+ *	and return its exit code in the integer pointed to by status. 
+ *	If that process has exited already, waitpid returns immediately. 
+ *	If that process does not exist, waitpid fails.
+ */
+int sys_waitpid(pid_t pid, userptr_t retstatus, int flags, pid_t *retpid)
+{
+	// The options argument should be 0. You are not required to implement any options.
+	// Check to make sure that options you do not support are not requested.
+	if(flags != 0) return EINVAL;
+	
+	//TODO check if userptr_t retstatus is valid, if not -> EFAULT
+	
+	(void) retstatus;
+	
+	// In OS/161, this is always the value of pid.
+	*retpid = pid;
+	
+}
+
+int sys_execv(userptr_t program, userptr_t args)
+{
+	(void) program;
+	(void) args;	
+	return EUNIMP;
+}
+
+#endif /* OPT_A2 */

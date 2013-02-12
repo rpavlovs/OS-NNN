@@ -1,0 +1,13 @@
+#!/bin/csh
+
+# This list leaves out f.
+# f test if the kernel protects writing to the code segment
+# set cmds = (a b c d e f g h i j k l m n o)
+set cmds = (a b c d e g h i j k l m n o)
+foreach i ($cmds)
+  echo ""
+  echo "running crash running crash with option = $i"
+#  sleep 3
+  sys161 kernel "p testbin/crash $i;q"
+end
+

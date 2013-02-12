@@ -1,0 +1,77 @@
+#!/bin/csh
+
+set usage = "Usage: $0 [inline]"
+set version = "Version 0.2"
+
+# In batch mode run a bunch of tests and strip
+# off a bunch of the sys161 and OS/161 output
+# that isn't relevant and makes it harder to find
+# the desired output.
+
+
+# This is a list of the test programs to run.
+# This is the old list verom version 0.1.
+set v01list = (_exit args exceptions execv fork \
+            kill-curthread lseek open-close \
+            read-file waitpid write-con write-file)
+
+# In S10 the students are implementing open/close, but not lseek;
+# so, tests that depend on lseek are not included.
+
+set list = (_exit args exceptions execv fork \
+            kill-curthread open-close \
+            read-file waitpid write-con write-file)
+
+set STRIP = ./strip-text
+set inline_badcalls = 0
+
+echo "RUNNING $0 : $version"
+
+if ($#argv != 0 && $#argv != 1) then
+    echo "$usage"
+    exit 1
+endif
+
+if ($#argv == 1) then
+  if ($1 == "inline") then
+    echo "Doing badcalls inline"
+    set inline_badcalls = 1
+  else 
+    echo "$usage"
+    exit 1
+  endif
+endif
+
+foreach i ($list) 
+  echo "---------------------------------------------------------------"
+  echo "RUNNING test-$i TESTS"
+  ./test-$i |& $STRIP
+  if ($inline_badcalls == 1) then
+    # If there is a badcalls test for this functionality call it now
+    if ( -e ./test-badcalls-$i ) then
+      echo "RUNNING test-badcalls-$i TESTS"
+	    ./test-badcalls-$i |& $STRIP
+    else 
+      # echo "NO BADCALLS TEST FOR $i"
+    endif
+  endif
+  echo ""
+end
+
+# We haven't done the badcalls inline so do them now at the end
+if ($inline_badcalls == 0) then
+  echo "RUNNING ALL BADCALLS TESTS NOW"
+	foreach i ($list)
+    if ( -e ./test-badcalls-$i ) then
+      echo "---------------------------------------------------------------"
+      echo "RUNNING test-badcalls-$i TESTS"
+	    ./test-badcalls-$i |& $STRIP
+    else 
+      # echo "NO BADCALLS TEST FOR $i"
+    endif
+    echo ""
+  end
+endif
+
+exit 0
+

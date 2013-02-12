@@ -1,0 +1,38 @@
+#!/bin/csh
+
+set usage = "Usage: $0"
+set version = "Version 0.3"
+
+# In batch mode run a bunch of tests and strip
+# off a bunch of the sys161 and OS/161 output
+# that isn't relevant and makes it harder to find
+# the desired output.
+
+
+# This is a list of the test programs to run.
+set list = (vm-basic vm-crash vm-replace vm-big-fork vm-big-no-fork vm-consecutive)
+
+set STRIP = ./strip-text
+
+echo "RUNNING $0 : $version"
+
+if ($#argv != 0) then
+    echo "$usage"
+    exit 1
+endif
+
+rm batch.out 2>&1 > /dev/null
+
+foreach i ($list) 
+  echo "---------------------------------------------------------------"
+  echo "RUNNING test-$i TESTS"
+  ./test-$i 2>&1 1> batch.out.tmp
+  cat batch.out.tmp |& $STRIP >> batch.out
+  cat batch.out.tmp |& egrep "OS/161 kernel: p|fail|SUCCEEDED|Passed|FAIL|OS/161 kernel:  p|^-----------^"
+  echo ""
+end
+
+rm batch.out.tmp
+
+exit 0
+
